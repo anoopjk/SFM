@@ -1,6 +1,7 @@
 from pathlib import Path
 import argparse
 import cv2
+import numpy as np
 import matplotlib.cm as cm
 import torch
 
@@ -57,18 +58,14 @@ class SuperGlueFeature(object):
     def initialize_matching(self):
         self.matching = Matching(self.config).eval().to(self.device)
 
-    def extract_features(self, frame, idx=0):
+
+    def feature_extraction_matching(self, frame0, frame1):
         
-        frame_tensor = frame2tensor(frame, self.device)
+        frame0_tensor = frame2tensor(frame0, self.device)
         keys = ['keypoints', 'scores', 'descriptors']
-        frame_data = self.matching.superpoint({'image': frame_tensor})
-        frame_data = {k+str(idx): frame_data[k] for k in keys}
-        frame_data['image'+str(idx)] = frame
-
-        return frame_data
-
-
-    def  match_features(self, frame0, frame1):
+        frame0_data = self.matching.superpoint({'image': frame0_tensor})
+        frame0_data = {k+'0': frame0_data[k] for k in keys}
+        frame0_data['image0'] = frame0_tensor
 
 
         # Create a window to display the demo.
@@ -78,50 +75,41 @@ class SuperGlueFeature(object):
         else:
             print('Skipping visualization, will not show a GUI.')
 
+        frame1_tensor = frame2tensor(frame1, self.device)
+        self.pred = self.matching({**frame0_data, 'image1': frame1_tensor})
+        self.kpts0 = frame0_data['keypoints0'][0].cpu().numpy()
+        self.kpts1 = self.pred['keypoints1'][0].cpu().numpy()
+        self.matches = self.pred['matches0'][0].cpu().numpy()
+        self.confidence = self.pred['matching_scores0'][0].cpu().numpy()
 
+        self.valid = self.matches > -1
+        self.mkpts0 = self.kpts0[self.valid]
+        self.mkpts1 = self.kpts1[self.matches[self.valid]]
 
-        frame_tensor = frame2tensor(frame, device)
-        pred = matching({**last_data, 'image1': frame_tensor})
-        kpts0 = last_data['keypoints0'][0].cpu().numpy()
-        kpts1 = pred['keypoints1'][0].cpu().numpy()
-        matches = pred['matches0'][0].cpu().numpy()
-        confidence = pred['matching_scores0'][0].cpu().numpy()
+        mkpts0, mkpts1 = np.round(self.mkpts0).astype(int), np.round(self.mkpts1).astype(int)
 
-        valid = matches > -1
-        mkpts0 = kpts0[valid]
-        mkpts1 = kpts1[matches[valid]]
-        color = cm.jet(confidence[valid])
+        return mkpts0, mkpts1
+
+    def plot_matches(self, frame0, frame1):
+        color = cm.jet(self.confidence[self.valid])
         text = [
             'SuperGlue',
-            'Keypoints: {}:{}'.format(len(kpts0), len(kpts1)),
-            'Matches: {}'.format(len(mkpts0))
+            'Keypoints: {}:{}'.format(len(self.kpts0), len(self.kpts1)),
+            'Matches: {}'.format(len(self.mkpts0))
         ]
-        k_thresh = matching.superpoint.config['keypoint_threshold']
-        m_thresh = matching.superglue.config['match_threshold']
+        k_thresh = self.matching.superpoint.config['keypoint_threshold']
+        m_thresh = self.matching.superglue.config['match_threshold']
         small_text = [
             'Keypoint Threshold: {:.4f}'.format(k_thresh),
             'Match Threshold: {:.2f}'.format(m_thresh),
-            'Image Pair: {:06}:{:06}'.format(stem0, stem1),
+            'Image Pair: {:06}:{:06}'.format(0, 1),
         ]
-
-    def plot_matches(self):
         out = make_matching_plot_fast(
-            last_frame, frame, kpts0, kpts1, mkpts0, mkpts1, color, text,
+            frame0, frame1, self.kpts0, self.kpts1, self.mkpts0, self.mkpts1, color, text,
             path=None, show_keypoints=self.show_keypoints, small_text=small_text)
 
         if not self.no_display:
             cv2.imshow('SuperGlue matches', out)
-            key = chr(cv2.waitKey(1) & 0xFF)
-            if key == 'q':
-                vs.cleanup()
-                print('Exiting (via q) demo_superglue.py')
-                break
-            elif key == 'n':  # set the current frame as anchor
-                last_data = {k+'0': pred[k+'1'] for k in keys}
-                last_data['image0'] = frame_tensor
-                last_frame = frame
-                last_image_id = (vs.i - 1)
-
 
 
         cv2.destroyAllWindows()

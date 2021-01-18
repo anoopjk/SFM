@@ -3,12 +3,10 @@ FROM anoop/pytorch:latest
 # create symlink of python3 as python so
 # that you don't have to use python3 command everytime
 RUN ln -sv /usr/bin/python3 /usr/bin/python
-RUN pip install jupyter
 
+RUN pip3 install --user 'git+https://github.com/facebookresearch/fvcore'
 
-RUN pip install --user 'git+https://github.com/facebookresearch/fvcore'
-
-RUN pip install open3d \
+RUN pip3 install open3d \
 				pandas  \
 				addict  \
 				plyfile  \
@@ -24,6 +22,10 @@ ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 
 # set a fixed model cache directory.
 ENV FVCORE_CACHE="/tmp"
+
+# set the working directory
+WORKDIR /SFM
+# CMD ["python", "run_pipeline.py"]
 
 
 
