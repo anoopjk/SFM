@@ -4,6 +4,7 @@ import numpy as np
 import open3d as o3d
 import time
 from quaternions import quat2mat
+from copy import deepcopy
 # import ipdb
 
 # ipdb.set_trace()
@@ -31,7 +32,6 @@ def read_poses_rgbdscenes(pose_path):
             pose_matrices = np.dstack((pose_matrices, pose_matrix))
     print(pose_matrices.shape)
     return pose_matrices[:,:,1:]
-
 
 def plot_camera_trajectory(pose_path):
 
@@ -65,8 +65,13 @@ def plot_camera_trajectory(pose_path):
     camera_list = [camera]
     for i in range(N//10):
         print('processing frame: ', i)
+        # quick check for translation freezing rotation
+        poses[:3,:3,i] = np.eye(3) 
+        poses[:3,3,i] =-(1/5)*poses[:3,3,i]
+        print('translation: ', poses[:3,3,i])
         camera.transform(poses[:,:,i])
-        camera_list.append(camera)
+        camera_new = deepcopy(camera).transform(poses[:,:,i])
+        camera_list.append(camera_new)
         vis.update_geometry(camera)
         vis.poll_events()
         vis.update_renderer()
@@ -79,5 +84,5 @@ def plot_camera_trajectory(pose_path):
 
 if __name__ == "__main__":
     # o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
-    pose_path = '/media/seagate4TB/deeplearning/datasets/rgbd-scenes/rgbd-scenes-v2_pc/rgbd-scenes-v2/pc/02.pose'
+    pose_path = '/media/seagate4TB/deeplearning/datasets/rgbd-scenes/rgbd-scenes-v2_pc/rgbd-scenes-v2/pc/07.pose'
     plot_camera_trajectory(pose_path)

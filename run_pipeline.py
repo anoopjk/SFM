@@ -11,7 +11,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Run feature matching')
     parser.add_argument('--input', help='images path', 
-    default='/media/seagate4TB/deeplearning/datasets/rgbd-scenes/rgbd-scenes-v2_imgs/rgbd-scenes-v2/imgs/scene_01/')
+    default='/media/seagate4TB/deeplearning/datasets/rgbd-scenes/rgbd-scenes-v2_imgs/rgbd-scenes-v2/imgs/scene_01/color')
     args = parser.parse_args()
 
     # run structure from motion

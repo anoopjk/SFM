@@ -3,6 +3,7 @@ import argparse
 import cv2
 import numpy as np
 import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 import torch
 
 from src.superglue.models.matching import Matching
@@ -20,7 +21,7 @@ class SuperGlueFeature(object):
         self.keypoint_threshold = 0.005
         self.nms_radius = 4
         self.sinkhorn_iterations = 20
-        self.match_threshold = 0.2
+        self.match_threshold = 0.5
         self.show_keypoints = True
         self.no_display = False
         self.force_cpu = False
@@ -58,9 +59,17 @@ class SuperGlueFeature(object):
     def initialize_matching(self):
         self.matching = Matching(self.config).eval().to(self.device)
 
+    def preprocess_input(self, frame):
+        # convert color frame to grayscale
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        return frame
+
 
     def feature_extraction_matching(self, frame0, frame1):
-        
+
+        frame0 = self.preprocess_input(frame0)
+        frame1 = self.preprocess_input(frame1)
+
         frame0_tensor = frame2tensor(frame0, self.device)
         keys = ['keypoints', 'scores', 'descriptors']
         frame0_data = self.matching.superpoint({'image': frame0_tensor})
@@ -91,6 +100,10 @@ class SuperGlueFeature(object):
         return mkpts0, mkpts1
 
     def plot_matches(self, frame0, frame1):
+
+        frame0 = self.preprocess_input(frame0)
+        frame1 = self.preprocess_input(frame1)
+
         color = cm.jet(self.confidence[self.valid])
         text = [
             'SuperGlue',
@@ -106,10 +119,12 @@ class SuperGlueFeature(object):
         ]
         out = make_matching_plot_fast(
             frame0, frame1, self.kpts0, self.kpts1, self.mkpts0, self.mkpts1, color, text,
-            path=None, show_keypoints=self.show_keypoints, small_text=small_text)
+            path=None, show_keypoints=self.show_keypoints, small_text=small_text,
+            opencv_display=True)
 
-        if not self.no_display:
-            cv2.imshow('SuperGlue matches', out)
+        # if not self.no_display:
+        # cv2.imshow('SuperGlue matches', out)
+        # plt.imshow(out)
 
 
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()

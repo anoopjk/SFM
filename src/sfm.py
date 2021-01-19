@@ -17,7 +17,8 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 from src.sfm_pipeline.feature_matching import Features
 from src.sfm_pipeline.fundamental_matrix import estimate_fundamental_matrix_ransac
-
+from src.visualization.camera_motion_visualizer import CameraViz
+from src.sfm_pipeline.camera_pose import estimate_pose
 
 
 #colors BGR format
@@ -55,6 +56,7 @@ class SFM(object):
         # kp1, des1 = feature_detection(img1)
         K = self.camera_intrinsics(img1.shape)
         # return img1, kp1, des1, K
+        self.camera = CameraViz()
         return img1, K
     ################################################################################################################################
 
@@ -93,14 +95,15 @@ class SFM(object):
                 ## TODO merge opencv and superglue configuration
                 # matches = feature_matching2(img1, img2, kp1, kp2, des1, des2)
             features = Features()
-            p1, p2 = features.feature_extraction_matching(img1, img2)
+            pts1, pts2 = features.feature_extraction_matching(img1, img2)
+            # print(pts1, pts2)
             
-            if len(p1) >= 8:                 
+            if len(pts1) >= 8:                 
                 
                 # p1, p2, matches = matches_2_point_pairs(kp1, kp2, matches)
-
+                # estimate the fundamental matrix given the  2d image point correspondences
                 # F_opencv = estimate_fundamental_matrix_opencv(img2, p1, p2, kp2, matches)
-                F_anoop = estimate_fundamental_matrix_ransac(p1, p2)
+                F_anoop = estimate_fundamental_matrix_ransac(pts1, pts2)
 
                 # print('F_opencv: ', F_opencv)
                 print('F_anoop: ', F_anoop)
@@ -109,7 +112,13 @@ class SFM(object):
                     print('F is None')
                     continue
 
-                
+                # estimate camera pose
+                R = estimate_pose(pts1, pts2, K, F_anoop)
+                pose = np.eye(4)
+                pose[:3,:3] = R
+                print(R)
+                self.camera.plot_camera_trajectory(pose)
+
             else:
                 print('skipping F no.of matches < 5')
             
@@ -117,7 +126,7 @@ class SFM(object):
             # update the keypoints and descriptors
             img1 = img2
 
-        
+        self.camera.close_window()
         cv2.destroyAllWindows()   
         plt.show() 
 
