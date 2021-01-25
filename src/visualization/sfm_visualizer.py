@@ -61,7 +61,13 @@ class SFMViz(object):
         self.vis_pcd.poll_events()
         self.vis_pcd.update_renderer()
 
-    def pointcloud_dump(self, p_3d, p_3d_color, output_path, name=''):
+    def plot_pointcloud_offline(self, p_3d, p_3d_color):
+
+        self.pcd.points = o3d.utility.Vector3dVector(p_3d)
+        self.pcd.colors = o3d.utility.Vector3dVector(p_3d_color)
+        o3d.visualization.draw_geometries([self.pcd])
+
+    def write_pointcloud(self, p_3d, p_3d_color, output_path, name=''):
         self.pcd.points = o3d.utility.Vector3dVector(p_3d)
         self.pcd.colors = o3d.utility.Vector3dVector(p_3d_color)
         

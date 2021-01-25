@@ -16,12 +16,12 @@ class PairGraph(object):
         
         # self.matches = np.hstack((pts1_2d, pts2_2d))
         N = pts1_2d.shape[0]
-        self.obs_val =  np.zeros((ncameras,N,2))            #np.hstack((pts1_2d, pts2_2d))
-        self.obs_val[0,:,:] = pts1_2d
-        self.obs_val[1,:,:] = pts2_2d
-        self.obs_idx = np.zeros((N,ncameras), dtype=np.int32)
-        self.obs_idx[:,0] = np.arange(0,N)
-        self.obs_idx[:,1] = np.arange(0,N)
+        self.kpts =  np.zeros((ncameras,N,2))            #np.hstack((pts1_2d, pts2_2d))
+        self.kpts[0,:,:] = pts1_2d
+        self.kpts[1,:,:] = pts2_2d
+        self.kpts_idxs = np.zeros((N,ncameras), dtype=np.int32)
+        self.kpts_idxs[:,0] = np.arange(0,N)
+        self.kpts_idxs[:,1] = np.arange(0,N)
 
 
 
