@@ -9,6 +9,7 @@ from numpy.linalg import svd
 import cv2
 from scipy.spatial.transform import Rotation as Rsci
 from src.sfm_pipeline.min_reprojection_error import estimate_camera_matrix
+from src.sfm_pipeline.triangulation import (triangulation_linear, triangulation_nonlinear)
 
 
 def reprojection(P: np.array, p_3d: np.array) \
@@ -23,29 +24,6 @@ def reprojection(P: np.array, p_3d: np.array) \
     p_2d = p_2d_h[:-1,:]/p_2d_h[-1,:]
     
     return p_2d
-
-def triangulation(P0: np.array, P1: np.array, p0_2d: np.array, p1_2d: np.array):
-    # -> Tuple[np.array, np.array]:
-    """[summary]
-
-    Args:
-        P0 (np.array): [description]
-        P1 (np.array): [description]
-        p0_2d (np.array): [description]
-        p1_2d (np.array): [description]
-    Returns:
-        [type]: [description]
-    """
-    N = len(p0_2d)
-    # print(P0.shape, P1.shape)
-    # the 2d points should be of size 2xN 
-    p1_3d_h = cv2.triangulatePoints(P0, P1, p0_2d.T, p1_2d.T) # P_3d11 is an 4xN  homogenious coordinates
-    p1_3d = p1_3d_h[:-1,:]/p1_3d_h[-1,:]
-#    print('P1_3d: ', P1_3d_h)
-    p1_2d_hat = reprojection(P1, p1_3d_h)
-    
-    
-    return p1_2d_hat, p1_3d
 
 def cheirality_check(R, t, pts_3d):
     """[summary]
@@ -67,7 +45,7 @@ def cheirality_check(R, t, pts_3d):
     return result
 
 
-def estimate_pose_5pt(p0_2d, p1_2d, K, F):
+def estimate_pose_8pt(p0_2d, p1_2d, K, F):
     """[summary]
 
     Args:
@@ -122,7 +100,7 @@ def estimate_pose_5pt(p0_2d, p1_2d, K, F):
     pose11[:3,:3] = R1
     pose11[:3,3] = t1.reshape(-1,)
     print('P11: ', P11)
-    p1_2d11, p1_3d11 = triangulation(P0.copy(), P11.copy(), p0_2d.copy(), p1_2d.copy())
+    p1_2d11, p1_3d11 = triangulation_linear(P0.copy(), P11.copy(), p0_2d.copy(), p1_2d.copy())
     p1_3d_dict['p1_2d11'] = [p1_2d11, p1_3d11, P11]
     sol_array[0,0] = 'p1_2d11'
     sol_array[0,1] = cheirality_check(R1, t1, p1_3d11)
@@ -136,7 +114,7 @@ def estimate_pose_5pt(p0_2d, p1_2d, K, F):
     pose12 = np.eye(4)
     pose12[:3,:3] = R1
     pose12[:3,3] = t2.reshape(-1,)
-    p1_2d12, p1_3d12 = triangulation(P0, P12, p0_2d, p1_2d)
+    p1_2d12, p1_3d12 = triangulation_linear(P0, P12, p0_2d, p1_2d)
     p1_3d_dict['p1_2d12'] = [p1_2d12, p1_3d12, P12]
     sol_array[1,0] = 'p1_2d12'
     sol_array[1,1] = cheirality_check(R1, t2, p1_3d12)
@@ -150,7 +128,7 @@ def estimate_pose_5pt(p0_2d, p1_2d, K, F):
     pose21 = np.eye(4)
     pose21[:3,:3] = R2
     pose21[:3,3] = t1.reshape(-1,)
-    p1_2d21, p1_3d21 = triangulation(P0, P21, p0_2d, p1_2d)    
+    p1_2d21, p1_3d21 = triangulation_linear(P0, P21, p0_2d, p1_2d)    
     p1_3d_dict['p1_2d21'] = [p1_2d21, p1_3d21, P21]
     sol_array[2,0] = 'p1_2d21'
     sol_array[2,1] = cheirality_check(R2, t1, p1_3d21)
@@ -164,7 +142,7 @@ def estimate_pose_5pt(p0_2d, p1_2d, K, F):
     pose22 = np.eye(4)
     pose22[:3,:3] = R2
     pose22[:3,3] = t2.reshape(-1,)
-    p1_2d22, p1_3d22 = triangulation(P0, P22, p0_2d, p1_2d)
+    p1_2d22, p1_3d22 = triangulation_linear(P0, P22, p0_2d, p1_2d)
     p1_3d_dict['p1_2d22'] = [p1_2d22, p1_3d22, P22]
     sol_array[3,0] = 'p1_2d22'
     sol_array[3,1] = cheirality_check(R2, t2, p1_3d22)
@@ -186,7 +164,7 @@ def estimate_pose_5pt(p0_2d, p1_2d, K, F):
     return p1_2d_reproj, p_3d, pose   #, sol_array[idxs[0],2]
 
 
-def estimate_pose_8pt(kpts0, kpts1, K0, K1, thresh=1, conf=0.99999):
+def estimate_pose_5pt(kpts0, kpts1, K0, K1, thresh=1, conf=0.99999):
     """
     Adapted from Superglue utils
 
@@ -230,11 +208,13 @@ def estimate_pose_8pt(kpts0, kpts1, K0, K1, thresh=1, conf=0.99999):
     P0 = np.eye(3,4)    
     Rt = np.hstack((R_best, t_best))
     P1 =  K1 @ Rt # K0 and K1 are same intrinsic matrices
-    kpts1_hat, p_3d = triangulation(P0, P1, kpts0, kpts1)
+    kpts1_hat, p_3d = triangulation_linear(P0, P1, kpts0, kpts1)
+    p_3d = triangulation_nonlinear(P0, P1, kpts0, kpts1, p_3d)
     print('error before lm: ', reprojection_error_SSD(kpts1_hat, kpts1))
     if kpts1.shape[0] > 10:
         P1 = estimate_camera_matrix(kpts1, p_3d, P1)
-        kpts1_hat, p_3d = triangulation(P0, P1, kpts0, kpts1)
+        kpts1_hat, p_3d = triangulation_linear(P0, P1, kpts0, kpts1)
+        p_3d = triangulation_nonlinear(P0, P1, kpts0, kpts1, p_3d)
         print('error after lm: ', reprojection_error_SSD(kpts1_hat, kpts1))
 
     pose = np.eye(4)

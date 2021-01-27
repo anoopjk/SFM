@@ -16,42 +16,44 @@ class SFMViz(object):
     def __init__(self):
         ## camera initalization
         ## The following creates a camera pyramid
-        self.camera = o3d.geometry.TriangleMesh.create_cone(radius=0.5, height=0.5, resolution=4, split=1)
+        self.camera = o3d.geometry.TriangleMesh.create_cone(radius=0.125, height=0.25, resolution=4, split=1)
         self.camera.paint_uniform_color([0.9, 0.1, 0.1])
         # self.camera = o3d.geometry.TriangleMesh.create_coordinate_frame()
         self.camera.compute_vertex_normals()
+        self.camera_list = [self.camera]
+        self.pcd = o3d.geometry.PointCloud()
 
-        # plot the trajectory of a camera
+
+    def create_windows(self):
+        self.vis_pcd = o3d.visualization.Visualizer()
+        self.vis_pcd.create_window()
         self.vis_camera = o3d.visualization.Visualizer()
         self.vis_camera.create_window()
         self.vis_camera.add_geometry(self.camera)
-        self.camera_list = [self.camera]
-        self.pcd = o3d.geometry.PointCloud()
-        self.vis_pcd = o3d.visualization.Visualizer()
-        self.vis_pcd.create_window()
-        
+
+    def stack_camera_poses(self, pose):
+        camera_new = deepcopy(self.camera).transform(pose)
+        self.camera_list.append(camera_new)
 
     def plot_camera_trajectory(self, pose):
 
         self.camera.transform(pose)
-        camera_new = deepcopy(self.camera).transform(pose)
-        self.camera_list.append(camera_new)
         self.vis_camera.update_geometry(self.camera)
         self.vis_camera.poll_events()
         self.vis_camera.update_renderer()
         # time.sleep(0.5)
 
 
-    def close_window(self):
+    def close_windows_online(self):
 
         self.vis_camera.destroy_window()
         self.vis_pcd.destroy_window()
 
-    def plot_cameras(self):
+    def plot_cameras_offline(self):
 
         o3d.visualization.draw_geometries(self.camera_list)
 
-    def plot_pointcloud(self, p_3d, p_3d_color):
+    def plot_pointcloud_online(self, p_3d, p_3d_color):
 
         self.pcd.points = o3d.utility.Vector3dVector(p_3d)
         self.pcd.colors = o3d.utility.Vector3dVector(p_3d_color)
@@ -66,6 +68,13 @@ class SFMViz(object):
         self.pcd.points = o3d.utility.Vector3dVector(p_3d)
         self.pcd.colors = o3d.utility.Vector3dVector(p_3d_color)
         o3d.visualization.draw_geometries([self.pcd])
+
+    def plot_cameras_pointcloud_offline(self, p_3d, p_3d_color):
+        self.pcd.points = o3d.utility.Vector3dVector(p_3d)
+        self.pcd.colors = o3d.utility.Vector3dVector(p_3d_color)
+        self.camera_list.append(self.pcd)
+        o3d.visualization.draw_geometries(self.camera_list)
+
 
     def write_pointcloud(self, p_3d, p_3d_color, output_path, name=''):
         self.pcd.points = o3d.utility.Vector3dVector(p_3d)

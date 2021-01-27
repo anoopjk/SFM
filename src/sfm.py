@@ -36,8 +36,9 @@ green = (0, 255, 0)
 blue = (255, 0, 0)
 
 class SFM(object):
-    def __init__(self, input_path):
+    def __init__(self, input_path, skip_factor):
         self.input = input_path
+        self.skip_factor = skip_factor
         self.pair_graphs = []
         self.K = None
         self.img1 = None
@@ -51,6 +52,7 @@ class SFM(object):
         self.min_lm_points = 10
         self.f = 100
         self.pose_i = np.eye(4)
+        self.online_plot = False
 
     def camera_intrinsics(self,img_shape):
         # camera intrinsics 
@@ -74,6 +76,8 @@ class SFM(object):
         self.K = self.camera_intrinsics(self.img1.shape)
         # return img1, kp1, des1, K
         self.mapper = SFMViz()
+        if self.online_plot:
+            self.mapper.create_windows()
 
     def run_sfm(self):
 
@@ -82,18 +86,18 @@ class SFM(object):
         # convert the video to images
         frames_path = self.input
         frame_names = os.listdir(frames_path)
-        skip_factor = 5
+        print('img skip factor: ', self.skip_factor)
         print ('len of frame_names before skip: ', len(frame_names))
         frame_names.sort()
         frame_names = frame_names[:]
-        frame_names = frame_names[::skip_factor] 
+        frame_names = frame_names[::self.skip_factor] 
         print ('final len of frame_names: ', len(frame_names))
 
 
         # img1, kp1, des1, K = sfm_init(frames_path, frame_names)
         self.sfm_init(frames_path, frame_names)
 
-        for ctr, frame_name in enumerate(frame_names[1:50:5]):
+        for ctr, frame_name in enumerate(frame_names[1:]):
             print ("reading image: ", frame_name)
             self.img2 = cv2.imread(os.path.join(frames_path, frame_name))
             if self.img2.shape[0] > 640:
@@ -128,7 +132,7 @@ class SFM(object):
                 # _, pts_3d, pose = estimate_pose(pts1.copy(), pts2.copy(), K, F_anoop)
                 # print('pose: ', pose)
                 # print('p_3d: ', pts_3d.shape)
-                _, pts_3d, pose = estimate_pose_8pt(self.pts1.copy(), self.pts2.copy(), self.K, self.K)
+                _, pts_3d, pose = estimate_pose_5pt(self.pts1.copy(), self.pts2.copy(), self.K, self.K)
                 print('pose: ', pose)
                 # self.mapper.plot_camera_trajectory(pose)
                 # self.mapper.plot_pointcloud(pts_3d.T, get_point_colors(pts2, pts_3d, img2))
@@ -145,8 +149,12 @@ class SFM(object):
                 if len(self.pts1) >= self.min_lm_points:
                     pair_graph = bundle_adjustment(pair_graph, self.K[0,-1], self.K[1,-1])
                     pose = np.eye(4)
-                    pose[:3,:3] = pair_graph.motion[1,:,:-1]
-                    self.mapper.plot_camera_trajectory(pose)
+                    # pose[:3,:3] = pair_graph.motion[1,:,:-1]
+                    pose[:3,:] = pair_graph.motion[1,:,:]
+                    if self.online_plot:
+                        self.mapper.plot_camera_trajectory(pose)
+                    # save all the camera poses
+                    self.mapper.stack_camera_poses(pose)
 
 
                 # update the pose
@@ -169,15 +177,17 @@ class SFM(object):
 
         # end of image for loop
 
-        # merge pair_graphs
-        for idx in range(len(self.pair_graphs)-1):
-            pg1, pg2 = self.pair_graphs[idx], self.pair_graphs[idx+1]
-            merge_graphs(pg1, pg2)
+        # # merge pair_graphs
+        # for idx in range(len(self.pair_graphs)-1):
+        #     pg1, pg2 = self.pair_graphs[idx], self.pair_graphs[idx+1]
+        #     merge_graphs(pg1, pg2)
 
         # plot the structure
-        self.mapper.plot_pointcloud_offline(self.pts_3d_acc, self.pts_3d_colors_acc)
+        # self.mapper.plot_cameras_offline()
+        # self.mapper.plot_pointcloud_offline(self.pts_3d_acc, self.pts_3d_colors_acc)
+        self.mapper.plot_cameras_pointcloud_offline(self.pts_3d_acc, self.pts_3d_colors_acc)
 
-        self.mapper.close_window()
+        # self.mapper.close_windows_online()
         cv2.destroyAllWindows()   
         plt.show() 
 
